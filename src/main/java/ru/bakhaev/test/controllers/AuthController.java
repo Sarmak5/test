@@ -24,19 +24,12 @@ public class AuthController {
     }
 
     @PostMapping(value = "/login")
-    public Mono<CustomResponseEntity> login(@RequestBody User user) {
+    public Mono<? extends CustomResponseEntity> login(@RequestBody User user) {
         return authService.findByEmailAndPassword(user.getEmail(), user.getPassword())
-                .log()
-                .defaultIfEmpty(new User())
-                .flatMap(existedUser -> {
-                    if (existedUser.getId() == null) {
-                        LOG.info("Wrong credentials {}", user);
-                        throw new AuthException(HttpStatus.BAD_REQUEST,
-                                "Wrong credentials", false);
-                    }
-                    return authService.findByEmailAndPassword(user.getEmail(), user.getPassword())
-                            .map(currentUser -> new UserResponse(true, "", currentUser));
-                });
+            .map(found -> new UserResponse(true, "", found))
+            .switchIfEmpty(
+                Mono.error(new AuthException(HttpStatus.FORBIDDEN, "Wrong credentials", false))
+            );
     }
 
     @PostMapping(value = "/register")
